@@ -16,4 +16,4 @@ shadowJar {
 
 run.jvmArgs('-noverify', '-XX:TieredStopAtLevel=1')
 
-mainClassName = "cqrslight.micronaut.Application"
+mainClassName = "nl.reinkrul.cqrslight.micronaut.Application"
