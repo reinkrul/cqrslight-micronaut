@@ -1,0 +1,2 @@
+rootProject.name = 'cqrslight-micronaut'
+include 'core', 'example'
