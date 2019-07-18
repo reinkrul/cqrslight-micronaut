@@ -1,3 +1,9 @@
 micronaut:
     application:
         name: cqrslight-micronaut
+    router:
+        static-resources:
+            default:
+                enabled: true
+                mapping: "/**"
+                paths: "classpath:public"

@@ -3,13 +3,12 @@ package nl.reinkrul.cqrslight.micronaut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Qualifier;
-import javax.inject.Singleton;
 
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import io.micronaut.context.BeanContext;
@@ -19,39 +18,46 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-@Singleton
-public class CommandHandlerProcessor implements ExecutableMethodProcessor<CommandHandler> {
+public abstract class HandlerProcessor<T extends Annotation> implements ExecutableMethodProcessor<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CommandHandlerProcessor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HandlerProcessor.class);
 
     private final BeanContext beanContext;
-    private final CommandInvoker commandInvoker;
+    private final Class<T> type;
 
-    @Inject
-    public CommandHandlerProcessor(final BeanContext beanContext, final CommandInvoker commandInvoker) {
+    public HandlerProcessor(final BeanContext beanContext, final Class<T> type) {
         this.beanContext = beanContext;
-        this.commandInvoker = commandInvoker;
+        this.type = type;
     }
 
     @Override
     public void process(final BeanDefinition<?> beanDefinition, final ExecutableMethod<?, ?> method) {
-        final Class<?> commandType = beanDefinition.getBeanType();
-        LOG.info("Registering command: {}", commandType);
-
+        final Class<?> handlerType = beanDefinition.getBeanType();
+        LOG.info("Registering {}: {}", type.getSimpleName(), handlerType);
+        if (handlerExists(getAlias(handlerType))) {
+            throw new IllegalArgumentException("Ambiguous command alias: " + handlerType);
+        }
         final List<Object> arguments = Arrays.stream(method.getArguments())
                                              .map(argument -> {
-                                                 final Object bean = getArgument(argument);
+                                                 final Object bean = getInjectableBeanFromArgument(argument);
                                                  if (bean == null) {
-                                                     throw new IllegalStateException("Could not find bean to inject for argument of type " + argument
-                                                             .getType() + " for command " + beanDefinition);
+                                                     throw new IllegalStateException("Could not find bean to inject for argument of type "
+                                                             + argument.getType() + " for " + handlerType + " " + beanDefinition);
                                                  }
                                                  return bean;
                                              }).collect(Collectors.toList());
-
-        commandInvoker.addInvoker(commandType, new Invoker(method, arguments));
+        registerInvoker(handlerType, new Invoker(method, arguments));
     }
 
-    private <T> T getArgument(final Argument<T> argument) {
+    protected abstract void registerInvoker(Class<?> handlerType, Invoker invoker);
+
+    protected abstract boolean handlerExists(final String alias);
+
+    protected String getAlias(final Class<?> handlerType) {
+        return handlerType.getSimpleName();
+    }
+
+    private <T> T getInjectableBeanFromArgument(final Argument<T> argument) {
         if (argument.getAnnotation(Qualifier.class) == null) {
             return beanContext.getBean(argument.getType());
         } else {
@@ -59,7 +65,7 @@ public class CommandHandlerProcessor implements ExecutableMethodProcessor<Comman
         }
     }
 
-    private class Invoker implements Consumer<Object> {
+    protected class Invoker implements Function {
         private final ExecutableMethod method;
         private final List<Object> arguments;
 
@@ -69,8 +75,8 @@ public class CommandHandlerProcessor implements ExecutableMethodProcessor<Comman
         }
 
         @Override
-        public void accept(final Object command) {
-            method.invoke(command, arguments.toArray(new Object[0]));
+        public Object apply(final Object command) {
+            return method.invoke(command, arguments.toArray(new Object[0]));
         }
     }
 }

@@ -4,6 +4,7 @@ dependencies {
     annotationProcessor "io.micronaut:micronaut-inject-java"
     annotationProcessor "io.micronaut:micronaut-validation"
     compileOnly "io.micronaut:micronaut-inject-java"
+    compile "io.micronaut:micronaut-inject"
     runtime "ch.qos.logback:logback-classic:1.2.3"
     testCompile "junit:junit:4.12"
     testCompile "io.micronaut:micronaut-inject-java"

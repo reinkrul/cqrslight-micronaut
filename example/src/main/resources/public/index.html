@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>CQRS Light Micronaut Example</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  class CqrsLight {
+
+    query(name, params) {
+      const queryString = (Array.isArray(params) ? params : [])
+        .map((param) => param[0] + '=' + encodeURIComponent(param[1]))
+        .join("&");
+      const url = '/query/' + name + '?' + queryString;
+      return fetch(url, {
+        method : 'GET',
+        mode : 'cors',
+        cache : 'no-cache',
+        credentials : 'same-origin',
+        redirect : 'follow',
+        referrer : 'no-referrer',
+      }).then(response => response.json());
+    }
+
+    command(name, data) {
+      const url = '/command/' + name;
+      return fetch(url, {
+        method : 'POST',
+        mode : 'cors',
+        cache : 'no-cache',
+        credentials : 'same-origin',
+        headers : {'Content-Type' : 'application/json'},
+        redirect : 'follow',
+        referrer : 'no-referrer',
+        body : JSON.stringify(data)
+      });
+    }
+
+    invoke(path, method, data, expectResponse) {
+
+    };
+  }
+
+  class App extends React.Component {
+    cqrs = new CqrsLight();
+    state = {
+      items : []
+    };
+
+    loadItems() {
+      this.cqrs.query('GetTodoListQuery').then(i => this.setState({items : i}));
+    }
+
+    componentDidMount() {
+      this.loadItems();
+    }
+
+    render() {
+      return <>
+        <h1>Todo</h1>
+        <TodoList items={this.state.items}/>
+        <TodoItemEntryForm cqrs={this.cqrs} itemAddedCallback={() => this.loadItems()}/>
+      </>;
+    }
+  }
+
+  class TodoItem extends React.Component {
+    render() {
+      return <li key={this.props.name}>{this.props.name}</li>
+    }
+  }
+
+  class TodoList extends React.Component {
+    render() {
+      const items = this.props.items.map(i => <TodoItem name={i}/>);
+      return <ul>{items}</ul>;
+    }
+  }
+
+  class TodoItemEntryForm extends React.Component {
+    submit() {
+      this.props.cqrs.command('CreateTodoItemCommand', {name : this.state.name})
+        .then(() => {
+          this.setState({name : ""});
+          this.props.itemAddedCallback();
+        });
+    }
+
+    setName(name) {
+      this.setState({name : name})
+    }
+
+    render() {
+      return <form className="form-inline">
+        <label>Name:</label>&nbsp;
+        <input type="text" className="form-control mb-2 mr-sm-2" placeholder="Enter name" onChange={(e) => this.setName(e.target.value)}/>
+        <button type="button" className="btn btn-primary mb-2" onClick={() => this.submit()}>Submit</button>
+      </form>;
+    }
+  }
+
+  ReactDOM.render(<App/>, document.getElementById('root'))
+</script>
+</body>
+</html>
